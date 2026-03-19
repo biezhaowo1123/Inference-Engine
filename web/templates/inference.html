@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>创建推理 - 进程推理引擎</title>
+    <link rel="stylesheet" href="/static/style.css?v=2">
+    <style>
+        .model-info {
+            font-size: 0.75rem;
+            color: var(--text-light);
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Inference Engine</h1>
+            <p class="subtitle">创建新的推理任务</p>
+        </header>
+
+        <nav class="main-nav">
+            <a href="/">首页</a>
+            <a href="/inference" class="active">创建推理</a>
+            <a href="/history">历史记录</a>
+        </nav>
+
+        <main>
+            <div class="inference-form">
+                <form id="inferenceForm">
+                    <div class="form-group">
+                        <label for="title">推理标题</label>
+                        <input type="text" id="title" name="title" placeholder="例如：秦朝历史推演-扶苏继位" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="domain">领域</label>
+                        <select id="domain" name="domain" required>
+                            <option value="">选择领域</option>
+                            <option value="历史">历史</option>
+                            <option value="商业">商业</option>
+                            <option value="技术">技术</option>
+                            <option value="社会">社会</option>
+                            <option value="个人">个人</option>
+                            <option value="其他">其他</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="subject">推理主体</label>
+                        <input type="text" id="subject" name="subject" placeholder="例如：秦朝" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="changePoint">关键变化点 / 假设条件</label>
+                        <textarea id="changePoint" name="changePoint" placeholder="例如：秦始皇病逝前成功传位于扶苏" required></textarea>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="startTime">起始时间</label>
+                            <input type="text" id="startTime" name="startTime" placeholder="例如：前210年">
+                        </div>
+                        <div class="form-group">
+                            <label for="endTime">结束时间</label>
+                            <input type="text" id="endTime" name="endTime" placeholder="例如：前180年">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="stepsCount">推理步数</label>
+                            <select id="stepsCount" name="stepsCount">
+                                <option value="3">3 步（快速预览）</option>
+                                <option value="5" selected>5 步（推荐）</option>
+                                <option value="7">7 步（深度分析）</option>
+                                <option value="10">10 步（完整推演）</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="model">AI 模型</label>
+                            <select id="model" name="model">
+                                <optgroup label="国内创业">
+                                    <option value="minimax" selected>MiniMax（推荐）</option>
+                                    <option value="moonshot">Moonshot（长文本）</option>
+                                    <option value="baichuan">百川</option>
+                                    <option value="yi">零一万物</option>
+                                </optgroup>
+                                <optgroup label="国际主流">
+                                    <option value="deepseek">DeepSeek（便宜）</option>
+                                    <option value="claude">Claude（推理强）</option>
+                                    <option value="gpt">GPT-4（综合强）</option>
+                                    <option value="gemini">Gemini（免费）</option>
+                                    <option value="mistral">Mistral</option>
+                                </optgroup>
+                                <optgroup label="国内大厂">
+                                    <option value="qwen">通义千问</option>
+                                    <option value="glm">智谱GLM</option>
+                                    <option value="wenxin">文心一言</option>
+                                    <option value="hunyuan">混元</option>
+                                    <option value="spark">星火</option>
+                                    <option value="doubao">豆包</option>
+                                </optgroup>
+                                <optgroup label="本地模型（免费）">
+                                    <option value="ollama">Ollama</option>
+                                </optgroup>
+                            </select>
+                            <div class="model-info">支持 22 种大模型</div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-submit">开始推理</button>
+                </form>
+            </div>
+
+            <!-- 结果展示区域 -->
+            <div id="resultArea" style="display: none;">
+                <div class="result-container">
+                    <h2>推理结果</h2>
+                    <div id="resultContent"></div>
+                </div>
+            </div>
+
+            <!-- 加载中 -->
+            <div id="loadingArea" style="display: none;">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>正在推理中，请稍候...</p>
+                    <p id="loadingStatus">准备开始...</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const form = document.getElementById('inferenceForm');
+        const resultArea = document.getElementById('resultArea');
+        const loadingArea = document.getElementById('loadingArea');
+        const resultContent = document.getElementById('resultContent');
+        const loadingStatus = document.getElementById('loadingStatus');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // 收集表单数据
+            const data = {
+                title: document.getElementById('title').value,
+                domain: document.getElementById('domain').value,
+                subject: document.getElementById('subject').value,
+                change_point: document.getElementById('changePoint').value,
+                time_frame: {
+                    start: document.getElementById('startTime').value,
+                    end: document.getElementById('endTime').value
+                },
+                steps_count: parseInt(document.getElementById('stepsCount').value),
+                model: document.getElementById('model').value
+            };
+
+            // 显示加载
+            form.style.display = 'none';
+            loadingArea.style.display = 'block';
+
+            try {
+                loadingStatus.textContent = '正在调用AI模型...';
+                
+                const response = await fetch('/api/inference', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    displayResult(result.data);
+                } else {
+                    alert('推理失败: ' + result.error);
+                    form.style.display = 'block';
+                    loadingArea.style.display = 'none';
+                }
+            } catch (error) {
+                alert('请求失败: ' + error.message);
+                form.style.display = 'block';
+                loadingArea.style.display = 'none';
+            }
+        });
+
+        function displayResult(data) {
+            loadingArea.style.display = 'none';
+            resultArea.style.display = 'block';
+
+            let html = `<h3>${escapeHtml(data.title)}</h3>`;
+            
+            if (data.steps && data.steps.length > 0) {
+                data.steps.forEach((step, index) => {
+                    const stepNum = step.step_number || (index + 1);
+                    const title = step.title || `第${stepNum}步`;
+                    const desc = step.description || '';
+                    const reasoning = step.reasoning || '';
+                    const confidence = step.confidence || 0.7;
+                    
+                    html += `
+                        <div class="step-card">
+                            <div class="step-header">
+                                <span class="step-number">第 ${stepNum} 步</span>
+                                <span class="confidence">置信度: ${(confidence * 100).toFixed(0)}%</span>
+                            </div>
+                            <h4>${escapeHtml(title)}</h4>
+                            ${desc ? `<p>${escapeHtml(desc)}</p>` : ''}
+                            ${reasoning ? `
+                                <div class="reasoning">
+                                    <strong>推理过程:</strong>
+                                    <p>${escapeHtml(reasoning)}</p>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                });
+            }
+
+            if (data.summary) {
+                html += `
+                    <div class="summary">
+                        <h4>总结</h4>
+                        <p>${escapeHtml(data.summary)}</p>
+                    </div>
+                `;
+            }
+
+            resultContent.innerHTML = html;
+        }
+
+        // 加载示例
+        const urlParams = new URLSearchParams(window.location.search);
+        const example = urlParams.get('example');
+        if (example) {
+            loadExampleData(example);
+        }
+
+        function loadExampleData(type) {
+            const examples = {
+                history: {
+                    title: '秦朝历史推演-扶苏继位',
+                    domain: '历史',
+                    subject: '秦朝',
+                    change_point: '秦始皇病逝前成功传位于扶苏，遗诏得以执行',
+                    startTime: '前210年',
+                    endTime: '前180年'
+                },
+                business: {
+                    title: '企业自主研发战略推演',
+                    domain: '商业',
+                    subject: '某科技公司',
+                    change_point: '公司决定坚持自主研发核心技术，不依赖外部供应商',
+                    startTime: '2024年',
+                    endTime: '2030年'
+                },
+                tech: {
+                    title: 'AI技术发展趋势推演',
+                    domain: '技术',
+                    subject: '编程行业',
+                    change_point: 'AI编程助手能力持续提升，代码生成质量接近人类水平',
+                    startTime: '2024年',
+                    endTime: '2030年'
+                },
+                personal: {
+                    title: '个人职业选择推演',
+                    domain: '个人',
+                    subject: '职业发展',
+                    change_point: '选择创业而非继续在大公司工作',
+                    startTime: '2024年',
+                    endTime: '2027年'
+                }
+            };
+
+            const data = examples[type];
+            if (data) {
+                document.getElementById('title').value = data.title;
+                document.getElementById('domain').value = data.domain;
+                document.getElementById('subject').value = data.subject;
+                document.getElementById('changePoint').value = data.change_point;
+                document.getElementById('startTime').value = data.startTime;
+                document.getElementById('endTime').value = data.endTime;
+            }
+        }
+        
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
