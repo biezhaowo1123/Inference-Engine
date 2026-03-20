@@ -401,6 +401,158 @@ header h1 {
     line-height: 1.5;
 }
 
+.summary-block {
+    margin-top: 10px;
+}
+
+.summary ul {
+    margin: 8px 0 0 18px;
+    color: var(--text-light);
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.summary li + li {
+    margin-top: 4px;
+}
+
+/* ==================== History Detail ==================== */
+.history-item-expanded {
+    border-color: var(--primary);
+    background: var(--bg-card);
+}
+
+.history-detail {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+}
+
+.detail-loading {
+    padding: 16px;
+    text-align: center;
+    color: var(--text-light);
+    background: var(--bg-card);
+    border-radius: 8px;
+}
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.detail-panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px;
+    margin-top: 16px;
+}
+
+.detail-panel h3 {
+    margin-bottom: 14px;
+    font-size: 1rem;
+}
+
+.detail-meta {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    color: var(--text-light);
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.graph-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 12px;
+    color: var(--text-light);
+    font-size: 0.85rem;
+}
+
+.graph-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    display: inline-block;
+}
+
+.legend-dot.reasoning {
+    background: var(--primary);
+}
+
+.legend-dot.fact {
+    background: #6bbf83;
+}
+
+.graph-scroll {
+    overflow-x: auto;
+    padding-bottom: 8px;
+}
+
+.topology-graph {
+    width: 100%;
+    min-width: 560px;
+    height: auto;
+    background: #fbfcfe;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.graph-edge line {
+    stroke: #9fb5c8;
+    stroke-width: 2;
+}
+
+.graph-edge text {
+    fill: var(--text-light);
+    font-size: 12px;
+}
+
+.graph-node rect {
+    stroke-width: 2;
+}
+
+.graph-node text {
+    fill: white;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.graph-node.reasoning rect {
+    fill: var(--primary);
+    stroke: var(--primary-dark);
+}
+
+.graph-node.fact rect {
+    fill: #6bbf83;
+    stroke: #4b9f67;
+}
+
+.graph-empty {
+    padding: 18px;
+    background: #fbfcfe;
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    color: var(--text-light);
+}
+
+.graph-empty strong {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--text-main);
+}
+
 /* ==================== Responsive ==================== */
 @media (max-width: 768px) {
     .form-row {
@@ -413,5 +565,9 @@ header h1 {
     
     header h1 {
         font-size: 1.5rem;
+    }
+
+    .detail-grid {
+        grid-template-columns: 1fr;
     }
 }

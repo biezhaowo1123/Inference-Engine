@@ -1,8 +1,8 @@
 package models
 
 import (
-	"time"
 	"gorm.io/gorm"
+	"time"
 )
 
 // User 用户模型
@@ -22,18 +22,23 @@ type InferenceTask struct {
 	ID          uint           `json:"id" gorm:"primaryKey"`
 	UserID      uint           `json:"user_id" gorm:"index"`
 	Title       string         `json:"title" gorm:"size:200"`
-	Domain      string         `json:"domain" gorm:"size:50"`  // 历史、商业、技术、个人等
-	Subject     string         `json:"subject" gorm:"size:200"` // 推理主体
-	ChangePoint string         `json:"change_point" gorm:"text"` // 关键变化点
+	Domain      string         `json:"domain" gorm:"size:50"`      // 历史、商业、技术、个人等
+	Subject     string         `json:"subject" gorm:"size:200"`    // 推理主体
+	ChangePoint string         `json:"change_point" gorm:"text"`   // 关键变化点
 	TimeFrame   string         `json:"time_frame" gorm:"size:100"` // 时间范围
 	Variables   string         `json:"variables" gorm:"type:json"` // JSON格式变量
 	ModelUsed   string         `json:"model_used" gorm:"size:50"`
 	StepsCount  int            `json:"steps_count"`
 	Status      string         `json:"status" gorm:"size:20"` // pending, processing, completed, failed
+	Summary     string         `json:"summary" gorm:"type:text"`
+	SummaryData string         `json:"summary_data" gorm:"type:json"`
+	GraphData   string         `json:"graph_data" gorm:"type:json"`
+	GraphStatus string         `json:"graph_status" gorm:"size:20"`
+	GraphError  string         `json:"graph_error" gorm:"type:text"`
 	CreatedAt   time.Time      `json:"created_at"`
 	UpdatedAt   time.Time      `json:"updated_at"`
 	DeletedAt   gorm.DeletedAt `json:"-" gorm:"index"`
-	
+
 	// 关联
 	Steps []InferenceStep `json:"steps,omitempty" gorm:"foreignKey:TaskID"`
 }
@@ -96,11 +101,42 @@ type InferenceRequest struct {
 
 // InferenceResult 推理结果
 type InferenceResult struct {
-	TaskID      uint                   `json:"task_id"`
-	Title       string                 `json:"title"`
-	Steps       []StepResult           `json:"steps"`
-	Summary     string                 `json:"summary"`
-	CreatedAt   time.Time              `json:"created_at"`
+	TaskID      uint              `json:"task_id"`
+	Title       string            `json:"title"`
+	Steps       []StepResult      `json:"steps"`
+	Summary     string            `json:"summary"`
+	SummaryData *InferenceSummary `json:"summary_data,omitempty"`
+	GraphData   *InferenceGraph   `json:"graph_data,omitempty"`
+	GraphStatus string            `json:"graph_status,omitempty"`
+	GraphError  string            `json:"graph_error,omitempty"`
+	CreatedAt   time.Time         `json:"created_at"`
+}
+
+// InferenceSummary 结构化总结
+type InferenceSummary struct {
+	Summary         string   `json:"summary"`
+	KeyFindings     []string `json:"key_findings"`
+	Recommendations []string `json:"recommendations"`
+}
+
+// InferenceGraph 整次推理的拓扑图
+type InferenceGraph struct {
+	Nodes []InferenceGraphNode `json:"nodes"`
+	Edges []InferenceGraphEdge `json:"edges"`
+}
+
+// InferenceGraphNode 拓扑图节点
+type InferenceGraphNode struct {
+	ID    string `json:"id"`
+	Label string `json:"label"`
+	Type  string `json:"type"`
+}
+
+// InferenceGraphEdge 拓扑图边
+type InferenceGraphEdge struct {
+	Source string `json:"source"`
+	Target string `json:"target"`
+	Label  string `json:"label"`
 }
 
 // StepResult 步骤结果

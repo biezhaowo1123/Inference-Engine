@@ -97,6 +97,22 @@
             color: white;
             border-color: var(--danger);
         }
+
+        .btn-detail {
+            background: transparent;
+            color: var(--primary);
+            border: 1px solid var(--border);
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-detail:hover {
+            border-color: var(--primary);
+            background: #eef7fd;
+        }
         
         .history-status {
             padding: 4px 10px;
@@ -211,6 +227,8 @@
     
     <script>
         let historyData = [];
+        const detailCache = new Map();
+        let expandedTaskId = null;
         
         async function loadHistory() {
             try {
@@ -249,6 +267,7 @@
                         <div class="history-title">${escapeHtml(task.title || '未命名任务')}</div>
                         <div class="history-actions">
                             <span class="history-status status-${task.status}">${getStatusText(task.status)}</span>
+                            <button class="btn-detail" id="task-detail-btn-${task.id}" onclick="toggleDetail(${task.id})">查看详情</button>
                             <button class="btn-delete" onclick="deleteTask(${task.id})">删除</button>
                         </div>
                     </div>
@@ -259,6 +278,7 @@
                         <span>${escapeHtml(task.model_used || '未知模型')}</span>
                         <span>${formatDate(task.created_at)}</span>
                     </div>
+                    <div class="history-detail" id="task-detail-${task.id}" hidden></div>
                 </div>
             `).join('');
         }
@@ -275,6 +295,257 @@
             `;
         }
         
+        async function toggleDetail(id) {
+            if (expandedTaskId === id) {
+                collapseDetail(id);
+                expandedTaskId = null;
+                return;
+            }
+
+            if (expandedTaskId !== null) {
+                collapseDetail(expandedTaskId);
+            }
+
+            expandedTaskId = id;
+            const detailEl = document.getElementById('task-detail-' + id);
+            const buttonEl = document.getElementById('task-detail-btn-' + id);
+            const itemEl = document.getElementById('task-' + id);
+
+            if (!detailEl || !buttonEl || !itemEl) {
+                return;
+            }
+
+            itemEl.classList.add('history-item-expanded');
+            detailEl.hidden = false;
+            buttonEl.textContent = '收起详情';
+            detailEl.innerHTML = '<div class="detail-loading">详情加载中...</div>';
+
+            if (detailCache.has(id)) {
+                renderTaskDetail(id, detailCache.get(id));
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/inference/' + id);
+                const data = await response.json();
+                if (!data.success || !data.data) {
+                    throw new Error(data.error || '详情加载失败');
+                }
+
+                detailCache.set(id, data.data);
+                if (expandedTaskId === id) {
+                    renderTaskDetail(id, data.data);
+                }
+            } catch (error) {
+                detailEl.innerHTML = `
+                    <div class="graph-empty">
+                        <strong>详情加载失败</strong>
+                        <p>${escapeHtml(error.message || '未知错误')}</p>
+                    </div>
+                `;
+            }
+        }
+
+        function collapseDetail(id) {
+            const detailEl = document.getElementById('task-detail-' + id);
+            const buttonEl = document.getElementById('task-detail-btn-' + id);
+            const itemEl = document.getElementById('task-' + id);
+
+            if (detailEl) {
+                detailEl.hidden = true;
+            }
+            if (buttonEl) {
+                buttonEl.textContent = '查看详情';
+            }
+            if (itemEl) {
+                itemEl.classList.remove('history-item-expanded');
+            }
+        }
+
+        function renderTaskDetail(id, task) {
+            const detailEl = document.getElementById('task-detail-' + id);
+            if (!detailEl) {
+                return;
+            }
+
+            detailEl.innerHTML = `
+                <div class="detail-grid">
+                    <section class="detail-panel">
+                        <h3>推理总结</h3>
+                        ${renderSummary(task)}
+                    </section>
+                    <section class="detail-panel">
+                        <h3>任务信息</h3>
+                        ${renderTaskMeta(task)}
+                    </section>
+                </div>
+                <section class="detail-panel">
+                    <h3>推理步骤</h3>
+                    ${renderSteps(task.steps)}
+                </section>
+                <section class="detail-panel">
+                    <h3>拓扑图</h3>
+                    ${renderGraph(task.graph_data, task.graph_status, task.graph_error)}
+                </section>
+            `;
+        }
+
+        function renderSummary(task) {
+            const summaryData = task.summary_data;
+            const summaryText = (summaryData && summaryData.summary) || task.summary || '暂无总结';
+
+            return `
+                <div class="summary">
+                    <p>${escapeHtml(summaryText)}</p>
+                    ${summaryData ? renderSummaryList('关键发现', summaryData.key_findings) : ''}
+                    ${summaryData ? renderSummaryList('建议', summaryData.recommendations) : ''}
+                </div>
+            `;
+        }
+
+        function renderTaskMeta(task) {
+            return `
+                <div class="detail-meta">
+                    <div><strong>领域:</strong> ${escapeHtml(task.domain || '-')}</div>
+                    <div><strong>主体:</strong> ${escapeHtml(task.subject || '-')}</div>
+                    <div><strong>变化点:</strong> ${escapeHtml(task.change_point || '-')}</div>
+                    <div><strong>时间范围:</strong> ${escapeHtml(task.time_frame || '-')}</div>
+                    <div><strong>模型:</strong> ${escapeHtml(task.model_used || '-')}</div>
+                    <div><strong>图谱状态:</strong> ${getGraphStatusText(task.graph_status)}</div>
+                </div>
+            `;
+        }
+
+        function renderSteps(steps) {
+            if (!steps || steps.length === 0) {
+                return '<div class="graph-empty"><p>暂无步骤数据</p></div>';
+            }
+
+            return steps.map(step => `
+                <div class="step-card">
+                    <div class="step-header">
+                        <span class="step-number">第 ${step.step_number || 0} 步</span>
+                        <span class="confidence">置信度: ${(((step.confidence || 0) * 100).toFixed(0))}%</span>
+                    </div>
+                    <h4>${escapeHtml(step.title || '未命名步骤')}</h4>
+                    <p>${escapeHtml(step.description || '')}</p>
+                    ${step.reasoning ? `
+                        <div class="reasoning">
+                            <strong>推理过程:</strong>
+                            <p>${escapeHtml(step.reasoning)}</p>
+                        </div>
+                    ` : ''}
+                </div>
+            `).join('');
+        }
+
+        function renderGraph(graphData, graphStatus, graphError) {
+            if (graphStatus === 'failed') {
+                return renderGraphEmptyState(graphError || '本次图谱生成失败');
+            }
+            if (!graphData || !graphData.nodes || graphData.nodes.length === 0) {
+                return renderGraphEmptyState('本次未生成拓扑图');
+            }
+
+            const svg = buildGraphSvg(graphData);
+            return `
+                <div class="graph-legend">
+                    <span><i class="legend-dot reasoning"></i>推理节点</span>
+                    <span><i class="legend-dot fact"></i>事实节点</span>
+                </div>
+                <div class="graph-scroll">
+                    ${svg}
+                </div>
+            `;
+        }
+
+        function renderGraphEmptyState(message) {
+            return `
+                <div class="graph-empty">
+                    <strong>暂无拓扑图</strong>
+                    <p>${escapeHtml(message || '本次未生成拓扑图')}</p>
+                </div>
+            `;
+        }
+
+        function buildGraphSvg(graphData) {
+            const factNodes = graphData.nodes.filter(node => node.type === 'fact');
+            const reasoningNodes = graphData.nodes.filter(node => node.type === 'reasoning');
+            const nodeWidth = 180;
+            const nodeHeight = 56;
+            const horizontalGap = 40;
+            const padding = 40;
+            const topRowY = 40;
+            const bottomRowY = 180;
+
+            const allRows = [factNodes, reasoningNodes].filter(row => row.length > 0);
+            const maxColumns = Math.max(...allRows.map(row => row.length), 1);
+            const width = Math.max(560, padding * 2 + maxColumns * nodeWidth + (maxColumns - 1) * horizontalGap);
+            const height = reasoningNodes.length > 0 ? 320 : 180;
+
+            const positions = new Map();
+            placeRow(factNodes, topRowY);
+            placeRow(reasoningNodes, bottomRowY);
+
+            const edgesMarkup = (graphData.edges || []).map(edge => {
+                const source = positions.get(edge.source);
+                const target = positions.get(edge.target);
+                if (!source || !target) {
+                    return '';
+                }
+
+                const x1 = source.x + nodeWidth / 2;
+                const y1 = source.y + nodeHeight;
+                const x2 = target.x + nodeWidth / 2;
+                const y2 = target.y;
+                const labelX = (x1 + x2) / 2;
+                const labelY = (y1 + y2) / 2 - 8;
+
+                return `
+                    <g class="graph-edge">
+                        <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"></line>
+                        <text x="${labelX}" y="${labelY}" text-anchor="middle">${escapeHtml(truncateLabel(edge.label || '', 12))}</text>
+                    </g>
+                `;
+            }).join('');
+
+            const nodesMarkup = graphData.nodes.map(node => {
+                const position = positions.get(node.id);
+                if (!position) {
+                    return '';
+                }
+
+                return `
+                    <g class="graph-node ${node.type}">
+                        <rect x="${position.x}" y="${position.y}" width="${nodeWidth}" height="${nodeHeight}" rx="${node.type === 'fact' ? 28 : 14}"></rect>
+                        <text x="${position.x + nodeWidth / 2}" y="${position.y + 32}" text-anchor="middle">${escapeHtml(truncateLabel(node.label || '', 20))}</text>
+                    </g>
+                `;
+            }).join('');
+
+            return `
+                <svg class="topology-graph" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet">
+                    ${edgesMarkup}
+                    ${nodesMarkup}
+                </svg>
+            `;
+
+            function placeRow(nodes, y) {
+                if (!nodes || nodes.length === 0) {
+                    return;
+                }
+
+                const rowWidth = nodes.length * nodeWidth + (nodes.length - 1) * horizontalGap;
+                const startX = Math.max(padding, (width - rowWidth) / 2);
+                nodes.forEach((node, index) => {
+                    positions.set(node.id, {
+                        x: startX + index * (nodeWidth + horizontalGap),
+                        y
+                    });
+                });
+            }
+        }
+
         async function deleteTask(id) {
             if (!confirm('确定要删除这条记录吗？')) {
                 return;
@@ -300,6 +571,10 @@
                             }
                         }, 300);
                     }
+                    detailCache.delete(id);
+                    if (expandedTaskId === id) {
+                        expandedTaskId = null;
+                    }
                 } else {
                     alert('删除失败: ' + (data.error || '未知错误'));
                 }
@@ -320,6 +595,8 @@
                 const data = await response.json();
                 
                 if (data.success) {
+                    detailCache.clear();
+                    expandedTaskId = null;
                     renderEmpty();
                     document.getElementById('clearBtn').style.display = 'none';
                 } else {
@@ -338,6 +615,15 @@
             };
             return statusMap[status] || status;
         }
+
+        function getGraphStatusText(status) {
+            const statusMap = {
+                'completed': '已生成',
+                'pending': '生成中',
+                'failed': '生成失败'
+            };
+            return statusMap[status] || '未生成';
+        }
         
         function formatDate(dateStr) {
             if (!dateStr) return '-';
@@ -355,6 +641,28 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        function renderSummaryList(title, items) {
+            if (!items || items.length === 0) {
+                return '';
+            }
+
+            return `
+                <div class="summary-block">
+                    <strong>${escapeHtml(title)}:</strong>
+                    <ul>
+                        ${items.map(item => `<li>${escapeHtml(item)}</li>`).join('')}
+                    </ul>
+                </div>
+            `;
+        }
+
+        function truncateLabel(text, maxLength) {
+            if (!text) {
+                return '';
+            }
+            return text.length > maxLength ? text.slice(0, maxLength - 1) + '…' : text;
         }
         
         loadHistory();

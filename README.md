@@ -1,6 +1,6 @@
 # Inference Engine
 
-基于大模型 API 的智能进程发展推理平台，支持 22+ 大模型，提供多步推理、多方案对比、可视化展示等功能。
+基于大模型 API 的智能进程发展推理平台，内置 24 个模型配置入口，提供多步推理、多方案对比、可视化展示等功能。
 
 [English](#english) | [中文](#中文)
 
@@ -11,7 +11,7 @@
 ### 功能特点
 
 - **多步推理** - 分步骤推演进程发展，每步包含标题、描述、推理逻辑和置信度
-- **多模型支持** - 支持 DeepSeek、Claude、GPT、Gemini、通义千问、智谱GLM、MiniMax 等 22+ 大模型
+- **多模型支持** - 支持按配置启用 DeepSeek、Claude、GPT、Gemini、通义千问、智谱GLM、MiniMax 等 24 个模型入口
 - **多方案对比** - 生成多种可能的发展路径
 - **可视化展示** - 清晰的时间线图表展示推理过程
 - **历史记录** - 保存推理历史，支持删除和清空
@@ -73,9 +73,17 @@ cd Inference-Engine
 cp configs/.env.example .env
 
 # 编辑配置文件，填入你的 API Key
-# 至少配置一个模型的 API Key
+# 至少启用一个模型，并填入对应 API Key
+# 同时把对应的 *_ENABLED 改成 true
 vim .env
 ```
+
+配置说明:
+
+- `DEFAULT_MODEL` 是请求体未显式传入 `model` 时使用的默认模型
+- 创建推理页面只会展示当前已启用的模型
+- 需要 API Key 的模型，除了 `*_ENABLED=true` 之外，还需要配置对应密钥
+- `ollama`、`vllm`、`localai` 这类本地 OpenAI 兼容接口可以不填 API Key
 
 #### 3. 运行
 
@@ -99,6 +107,11 @@ go run ./cmd/server
 4. 设置时间范围和推理步数
 5. 选择 AI 模型
 6. 点击「开始推理」
+
+说明:
+
+- 如果请求中不传 `model`，后端会回退到 `.env` 里的 `DEFAULT_MODEL`
+- 页面中的模型列表由后端动态返回，只显示当前真实可用的模型
 
 ### 示例场景
 
@@ -150,10 +163,16 @@ Content-Type: application/json
     "subject": "秦朝",
     "change_point": "扶苏继位",
     "time_frame": {"start": "前210年", "end": "前180年"},
-    "steps_count": 5,
-    "model": "minimax"
+    "steps_count": 5
 }
 ```
+
+`model` 字段可选；如果省略，则使用 `DEFAULT_MODEL`。
+
+当前代码状态补充说明:
+
+- OpenAI-compatible 路线已经接通，可用于 DeepSeek、GPT、Qwen、MiniMax、OpenRouter、Ollama、vLLM、LocalAI 等接口风格兼容的提供商
+- Claude、Gemini、文心一言、Cohere 这些专用适配器目前还是占位实现，适合继续开发后再用于真实生产调用
 
 #### 获取推理结果
 
@@ -209,12 +228,12 @@ MIT License
 
 ## English
 
-An intelligent process inference platform based on LLM APIs, supporting 22+ models with multi-step reasoning, multi-scenario comparison, and visualization.
+An intelligent process inference platform based on LLM APIs with 24 built-in model configuration entries, supporting multi-step reasoning, multi-scenario comparison, and visualization.
 
 ### Features
 
 - **Multi-step Reasoning** - Step-by-step process inference with title, description, reasoning logic, and confidence
-- **Multi-model Support** - Support for DeepSeek, Claude, GPT, Gemini, Qwen, GLM, MiniMax, and 22+ LLMs
+- **Multi-model Support** - Support for enabling DeepSeek, Claude, GPT, Gemini, Qwen, GLM, MiniMax, and 24 model entries through configuration
 - **Multi-scenario Comparison** - Generate multiple possible development paths
 - **Visualization** - Clear timeline display of inference process
 - **History Management** - Save inference history with delete and clear functions
@@ -228,7 +247,7 @@ cd Inference-Engine
 
 # Configure API Key
 cp configs/.env.example .env
-# Edit .env and add your API Key
+# Edit .env, enable at least one model, and add its API key if required
 
 # Run
 go mod tidy
@@ -247,6 +266,12 @@ go run ./cmd/server
 | DELETE | /api/history/:id | Delete single history |
 | DELETE | /api/history | Clear all history |
 | GET | /api/models | Get available models |
+
+Notes:
+
+- If `model` is omitted in `POST /api/inference`, the backend falls back to `DEFAULT_MODEL`
+- The inference page only renders models that are actually enabled and available
+- OpenAI-compatible providers are wired up; some provider-specific adapters are still placeholders and need additional implementation
 
 ### Tech Stack
 
